@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <!-- Required meta tags -->
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, shrink-to-fit=no"
+    />
+
+    <!-- Bootstrap CSS -->
+    <link
+      rel="stylesheet"
+      href="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css"
+      integrity="sha384-Vkoo8x4CGsO3+Hhxv8T/Q5PaXtkKtu6ug5TOeNV6gBiFeWPGFN9MuhOf23Q9Ifjh"
+      crossorigin="anonymous"
+    />
+    <link href="https://fonts.googleapis.com/css2?family=Ubuntu&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Open+Sans&display=swap" rel="stylesheet">
+
+    <title>Hello, world!</title>
+
+    <style>
+      #url-input {
+        padding: 24px;
+        font-family: 'Ubuntu', sans-serif;
+        font-size: 19px;
+      }
+      #shorten-btn{
+        font-family: 'Open Sans', sans-serif;
+      }
+      #dropdownMenuButton  {
+        font-family: 'Open Sans', sans-serif;
+        font-weight: bold;
+      }
+
+      #main {
+        padding: 0px 20%;
+      }
+
+    </style>
+  </head>
+  <body>
+    <div class="container shadow-sm" style="padding:5% 3%">
+      <form class="text-center border border-light p-5 mr-5" action="/shorten" method="POST">
+        <div id="main">
+          <div class="row mb-3">
+            <div class="col">
+              <input
+                type="text"
+                id="url-input"
+                name="url-input"
+                class="form-control"
+                placeholder="http://yoururl.com"
+              />
+            </div>
+          </div>
+          <div class="row mb-5 justify-content-end">
+            <div class="col-3">
+              <div class="dropdown ">
+                <button
+                  class="btn btn-primary dropdown-toggle"
+                  type="button"
+                  id="dropdownMenuButton"
+                  data-toggle="dropdown"
+                  aria-haspopup="true"
+                  aria-expanded="false"
+                  data-toggle="tooltip" data-placement="top" title="When should your short URL expire ?"
+                >
+                  Expire
+                </button>
+                <div class="dropdown-menu" aria-labelledby="dropdownMenuButton">
+                  <h6 class="dropdown-header">Expire</h6>
+                  <option class="dropdown-item" value="5">5 minutes</option>
+                  <option class="dropdown-item" value="10">10 minutes</option>
+                  <option class="dropdown-item" value="15">15 minutes</option>
+                  <option class="dropdown-item" value="30">30 minutes</option>
+                  <option class="dropdown-item" value="60">1 hour</option>
+                  <option class="dropdown-item active" value="0">Never</option>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>  
+          <input type="hidden" name="deleteAfter" id="deleteAfter" value="0">
+          <div class="row">
+            <div class="col">
+              <button id="shorten-btn" class="btn btn-info btn-lg rounded-pill col-md-4 font-weight-bold" type="submit">
+                SHORTEN
+              </button>
+            </div>
+          </div>
+        </div>
+      </form>
+    </div>
+
+
+    <!-- Default form login -->
+    <!-- Optional JavaScript -->
+    <!-- jQuery first, then Popper.js, then Bootstrap JS -->
+    <script
+      src="https://code.jquery.com/jquery-3.4.1.slim.min.js"
+      integrity="sha384-J6qa4849blE2+poT4WnyKhv5vZF5SrPo0iEjwBvKU7imGFAV0wwj1yYfoRSJoZ+n"
+      crossorigin="anonymous"
+    ></script>
+    <script
+      src="https://cdn.jsdelivr.net/npm/popper.js@1.16.0/dist/umd/popper.min.js"
+      integrity="sha384-Q6E9RHvbIyZFJoft+2mJbHaEWldlvI9IOYy5n3zV9zzTtmI3UksdQRVvoxMfooAo"
+      crossorigin="anonymous"
+    ></script>
+    <script
+      src="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/js/bootstrap.min.js"
+      integrity="sha384-wfSDF2E50Y2D1uUdj0O3uMBJnjuUD4Ih7YwaYd1iqfktj0Uod8GCExl3Og8ifwB6"
+      crossorigin="anonymous"
+    ></script>
+
+
+
+    <script>
+      $(".dropdown-menu option").on('click', function(){
+        $("#dropdownMenuButton").text($(this).text());
+
+        $("#deleteAfter").val($(this).attr("value"))
+
+        $(this).addClass("active");
+        $(this).siblings().each((i, e) => $(e).removeClass("active"));
+      });
+    </script>
+
+  </body>
+</html>
