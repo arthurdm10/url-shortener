@@ -27,33 +27,33 @@
 
       <div class="collapse navbar-collapse" id="navbarSupportedContent">
         <ul class="navbar-nav mr-auto">
-          <li class="nav-item active">
+          <li class="nav-item">
             <a class="nav-link" href="/">Home</a>
           </li>
           <li class="nav-item">
             <a class="nav-link" href="/myUrls">My URLs</a>
           </li>
-          </ul>
+        </ul>
       </div>
     </nav>
-    <div class="container">
+    <div class="container mt-5">
       <div class="row">
-        <div class="col s4"><b>URL:</b> {{ .url.original_url }}</div>
+        <div class="col s4"><b>URL:</b> {{ .url.Original }}</div>
       </div>
 
       <div class="row">
-        <div class="col s4"><b>Short link:</b> {{ .url.short_url }}</div>
+        <div class="col s4"><b>Short link:</b> {{ .url.Short }}</div>
       </div>
 
       <div class="row">
-        <a href="/delete/{{.url.Code}}">Delete URL</a>
+        <a href="/del/{{.url.Code}}">Delete URL</a>
       </div>
       
      
         <div id="carouselExampleControls" class="row carousel slide" data-ride="carousel">
         <div class="carousel-inner">
             <div class="carousel-item active">
-                <div id="regions_div"   style="height: 500"></div>
+                    <div id="regions_div" style="width:70%; margin-left:10%;"></div>
             </div>
             <div class="carousel-item">
                   <div class="row">
@@ -76,31 +76,9 @@
         </a>
         </div>
       <div class="row" style="margin-top:55px">
-        <h4>Clicks - {{ .totalClicks }}</h4>
+        <h4>Clicks - {{ .url.Stats.clicks }}</h4>
       </div>
 
-      <div class="row">
-        <div class="col s12">
-          <table style="table-layout:fixed; width:100%">
-            <thead>
-              <th>IP</th>
-              <th>Country</th>
-              <th>Referer</th>
-              <th></th>
-            </thead>
-            <tbody>
-              {{ range $request := .url.reqs }}
-              <tr>
-                <td>{{ $request.ip.ip}}</td>
-                <td>{{ $request.ip.country}}</td>
-                <td>{{ $request.referer}}</td>
-                <td>{{ $request.time}}</td>
-              </tr>
-              {{end}}
-            </tbody>
-          </table>
-        </div>
-      </div>
     </div>
 
 <script src="https://code.jquery.com/jquery-3.4.1.slim.min.js" integrity="sha384-J6qa4849blE2+poT4WnyKhv5vZF5SrPo0iEjwBvKU7imGFAV0wwj1yYfoRSJoZ+n" crossorigin="anonymous"></script>
@@ -119,7 +97,7 @@
       function drawRegionsMap() {
         const data = google.visualization.arrayToDataTable([
           ['Country', 'Clicks'],
-          {{range $country, $total := .url.countries}}
+          {{range $country, $total := .url.Stats.countries}}
             ['{{ $country }}', {{ $total }}],
           {{end}}
         ]);
@@ -134,12 +112,17 @@
       }
 
       function drawRefererChart() {
-          const data = google.visualization.arrayToDataTable([
+          const data = [
           ['Referer', 'Total'],
-          {{range $referer, $total := .url.referers}}
+          {{range $referer, $total := .url.Stats.referer}}
             ['{{ $referer }}', {{ $total }}],
           {{end}}
-        ]);
+        ];
+        
+        for(let d of data) {
+          d[0] = d[0].replace(/_/g,".");
+        }
+        const chartData = google.visualization.arrayToDataTable(data);
 
         const options = {
           title: 'Referers',
@@ -148,16 +131,19 @@
         };
 
         const chart = new google.visualization.PieChart(document.getElementById('referer_chart'));
-        chart.draw(data, options);
+        chart.draw(chartData, options);
       }
 
       function drawBrowsersChart() {
-          const data = google.visualization.arrayToDataTable([
-          ['Browser', 'Total'],
-          {{range $browser, $total := .url.browsers}}
-            ['{{ $browser }}', {{ $total }}],
-          {{end}}
-        ]);
+        const data =[
+            ['Browser', 'Total'],
+            {{range $browser, $total := .url.Stats.browsers}}
+              ['{{ $browser }}', {{ $total }}],
+            {{end}}
+        ]  
+
+        const chartData = google.visualization.arrayToDataTable(data);
+
 
         const options = {
           title: 'Browsers',
@@ -166,7 +152,7 @@
         };
 
         const chart = new google.visualization.PieChart(document.getElementById('browsers_chart'));
-        chart.draw(data, options);
+        chart.draw(chartData, options);
       }
     </script>
 

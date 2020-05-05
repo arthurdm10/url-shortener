@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"xojoc.pw/useragent"
@@ -66,6 +67,7 @@ func Shorten(s *Server) FiberHandler {
 				DeleteAfter: deleteAfter,
 				Session:     session.ID(),
 				CreatedAt:   time.Now(),
+				Stats:       bson.M{},
 			}
 
 			url.Shorten()
@@ -109,20 +111,26 @@ func Redirect(s *Server) FiberHandler {
 			}(url)
 
 			log.Println("expired")
-			c.Redirect("/", http.StatusTemporaryRedirect)
+			c.Redirect("/", http.StatusPermanentRedirect)
 			return
 		}
 
+		//get information about the client's IP
 		go func(clientIP, referer, userAgentStr string) {
 			ipInfo := getIPinfo(clientIP)
 			userAgent := parseUserAgent(userAgentStr)
+			referer = strings.Replace(referer, ".", "_", -1)
 
-			urlRequest := models.NewURLRequest(short, referer, ipInfo, userAgent)
+			if referer == "" {
+				referer = "none"
+			}
 
-			err = s.URLRequestRepo.CreateURLRequest(urlRequest)
+			err := s.URLrepo.IncrementURLStats(short, strings.ToLower(ipInfo["country"].(string)), referer, userAgent.Name, userAgent.OS)
+
 			if err != nil {
 				log.Println("Failed to create URLRequest " + err.Error())
 			}
+
 		}(c.IP(), c.Get("referer"), c.Get("user-agent"))
 
 		c.Redirect(url.Original, http.StatusTemporaryRedirect)
@@ -133,14 +141,14 @@ func Redirect(s *Server) FiberHandler {
 func URLInfo(s *Server) FiberHandler {
 	return func(c *fiber.Ctx) {
 
-		url, err := s.URLrepo.GetUrlRequests(c.Params("code"))
+		url, err := s.URLrepo.GetUrlByCode(c.Params("code"))
 
 		if err != nil {
 			log.Println(err.Error())
 			return
 		}
 
-		err = c.Render("./public/info.html", fiber.Map{"url": url, "totalClicks": len(url["reqs"].(bson.A))})
+		err = c.Render("./public/info.html", fiber.Map{"url": url})
 		if err != nil {
 			log.Println(err.Error())
 			c.SendStatus(http.StatusInternalServerError)
@@ -159,43 +167,54 @@ func DeleteURL(s *Server) FiberHandler {
 
 		if err == mongo.ErrNoDocuments {
 			log.Println(err)
-			c.SendStatus(http.StatusNotFound)
+			c.Redirect("/myUrls?err=URL not found!")
 			return
 		} else if err != nil {
 			log.Println(err)
 			c.SendStatus(http.StatusInternalServerError)
+			c.Redirect("/myUrls?err=Internal error")
 			return
 		}
 
-		c.Redirect("/", http.StatusOK)
+		c.Redirect("/myUrls?success=deleted")
 	}
 }
 
+//MyURLs returns urls of the current session
 func MyURLs(s *Server) FiberHandler {
 	return func(c *fiber.Ctx) {
 		session := s.sessions.Start(c)
+		urls, err := s.URLrepo.GetURLSBySession(session.ID(), 25)
 
+		if err != nil && err != mongo.ErrNoDocuments {
+			log.Println(err.Error())
+			c.SendStatus(http.StatusInternalServerError)
+			return
+		}
+
+		if err = c.Render("./public/myUrls.html", fiber.Map{"urls": urls}); err != nil {
+			log.Println(err.Error())
+		}
 	}
 }
 
 func getIPinfo(ip string) bson.M {
 	var ipData bson.M
-	resp, _ := http.Get("https://extreme-ip-lookup.com/json/" + ip)
+	resp, _ := http.Get("https://extreme-ip-lookup.com/json/" /*+ ip*/)
 
 	json.NewDecoder(resp.Body).Decode(&ipData)
 	return ipData
 }
 
-func parseUserAgent(userAgent string) bson.M {
+func parseUserAgent(userAgent string) *useragent.UserAgent {
 	uagent := useragent.Parse(userAgent)
 
 	if uagent != nil {
-		return bson.M{
-			"os":      uagent.OS,
-			"browser": uagent.Name,
-			"mobile":  uagent.Mobile || uagent.Tablet,
-		}
+		return uagent
 	}
 
-	return nil
+	return &useragent.UserAgent{
+		Name: "",
+		OS:   "",
+	}
 }

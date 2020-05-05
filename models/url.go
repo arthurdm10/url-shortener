@@ -4,19 +4,24 @@ import (
 	"bytes"
 	"math/rand"
 	"time"
+
+	"go.mongodb.org/mongo-driver/bson"
 )
 
 type Url struct {
-	Original    string `form:"url" bson:"original_url" binding:"required"` // Url to be shortened
+	Original    string `form:"url" bson:"original" binding:"required"` // Url to be shortened
 	Session     string `bson:"session"`
 	DeleteAfter *int   `form:"delete_after" bson:"delete_after" binding:"required,min=0"` // Delete after X minutes. if it's 0, then it will not be automatically deleted
 
-	Short     string    `bson:"short_url"`  // Shortened url
+	Short     string    `bson:"short"`      // Shortened url
 	Code      string    `bson:"code"`       // Used to delete and get url info
 	CreatedAt time.Time `bson:"created_at"` //When this url was created
+	Stats     bson.M    `bson:"stats"`      //statistics about clicks
 }
 
+//Shorten generates a random short code
 func (url *Url) Shorten() {
+	rand.Seed(time.Now().Unix())
 	url.Short = randomString(6)
 	url.Code = randomString(6)
 }

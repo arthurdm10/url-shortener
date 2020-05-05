@@ -2,8 +2,9 @@ package repository
 
 import (
 	"context"
-	"log"
 	"time"
+
+	"go.mongodb.org/mongo-driver/mongo/options"
 
 	"github.com/arthurdm10/url-shortener/models"
 
@@ -36,8 +37,11 @@ func (u *URLRepository) DeleteURL(code, session string) error {
 func (u *URLRepository) GetUrl(short string) (models.Url, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	log.Println(short)
-	urlDoc := u.DB.Collection("urls").FindOne(ctx, bson.M{"short_url": short})
+	urlDoc := u.DB.Collection("urls").FindOne(ctx, bson.M{"short": short},
+		&options.FindOneOptions{
+			Projection: bson.M{"original": 1, "created_at": 1, "delete_after": 1},
+		},
+	)
 
 	if urlDoc.Err() != nil {
 		return models.Url{}, urlDoc.Err()
@@ -54,8 +58,35 @@ func (u *URLRepository) GetUrl(short string) (models.Url, error) {
 	return url, nil
 }
 
+//IncrementURLStats increments the total of clicks/requests in this URL
+func (u *URLRepository) IncrementURLStats(short, country, referer, browser, os string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
+
+	updateQuery := bson.M{
+		"stats.clicks":               1,
+		"stats.countries." + country: 1,
+		"stats.referer." + referer:   1,
+	}
+
+	if browser != "" {
+		updateQuery["stats.browser."+browser] = 1
+	}
+
+	if os != "" {
+		updateQuery["stats.os."+os] = 1
+	}
+
+	res := u.DB.Collection("urls").FindOneAndUpdate(ctx,
+		bson.M{"short": short},
+		bson.M{"$inc": updateQuery},
+	)
+
+	return res.Err()
+}
+
 //GetURLSBySession get urls from a session
-func (u *URLRepository) GetURLSBySession(session string, limit int) ([]bson.M, error) {
+func (u *URLRepository) GetURLSBySession(session string, limit int) ([]models.Url, error) {
 	cursor, err := u.DB.Collection("urls").Aggregate(context.TODO(), bson.A{
 		bson.M{
 			"$match": bson.M{
@@ -65,126 +96,37 @@ func (u *URLRepository) GetURLSBySession(session string, limit int) ([]bson.M, e
 			},
 		},
 		bson.M{"$limit": limit},
-		bson.M{
-			"$lookup": bson.M{
-				"from":         "requests",
-				"localField":   "short_url",
-				"foreignField": "url_short",
-				"as":           "reqs",
-			},
-		},
-		bson.M{
-			"$project": bson.M{
-				"_id":          0,
-				"original_url": 1,
-				"short_url":    1,
-				"code":         1,
-				"created_at":   1,
-				"totalRequests": bson.M{
-					"$size": "$reqs",
-				},
-			},
-		},
-		bson.M{"$sort": bson.M{"created_at": 0}},
+		bson.M{"$sort": bson.M{"created_at": -1}},
 	})
 
 	if err != nil {
 		return nil, err
 	}
 
-	var urls []bson.M
+	var urls []models.Url
 
 	err = cursor.All(context.Background(), &urls)
 
 	return urls, err
 }
 
-func (u *URLRepository) GetUrlRequests(code string) (bson.M, error) {
-	cursor, err := u.DB.Collection("urls").Aggregate(context.TODO(), bson.A{
-		bson.M{"$match": bson.M{"code": code}},
-		bson.M{
-			"$lookup": bson.M{
-				"from": "requests",
-				"let": bson.M{
-					"url_code": "$code",
-				},
-				"pipeline": bson.A{
-					bson.M{
-						"$match": bson.M{
-							"$expr": bson.M{
-								"$eq": bson.A{
-									"$$url_code", code,
-								},
-							},
-						},
-					},
-					bson.M{"$limit": 25},
-				},
-				"as": "reqs",
-			},
-		},
-	})
+//GetUrlByCode get url info
+func (u *URLRepository) GetUrlByCode(code string) (*models.Url, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
+	urlDoc := u.DB.Collection("urls").FindOne(ctx, bson.M{"code": code})
+
+	if urlDoc.Err() != nil {
+		return nil, urlDoc.Err()
+	}
+
+	url := models.Url{}
+
+	err := urlDoc.Decode(&url)
 
 	if err != nil {
 		return nil, err
 	}
 
-	cursor.Next(context.Background())
-	var urlInfo bson.M
-	err = cursor.Decode(&urlInfo)
-
-	if err != nil {
-		return nil, err
-	}
-	countries := make(map[string]int)
-	referers := make(map[string]int)
-	browsers := make(map[string]int)
-
-	for _, request := range urlInfo["reqs"].(bson.A) {
-		req := request.(bson.M)
-		ipReq := req["ip"].(bson.M)
-
-		countryCode := ipReq["country"].(string)
-		referer := req["referer"].(string)
-
-		if countryCode != "" {
-			_, found := countries[countryCode]
-			if found {
-				countries[countryCode] += 1
-				continue
-			}
-
-			countries[countryCode] = 1
-		}
-
-		if referer != "" {
-			_, found := referers[referer]
-			if found {
-				referers[referer] += 1
-				continue
-			}
-
-			referers[referer] = 1
-		}
-		if req["user_agent"] == nil {
-			continue
-		}
-		userAgent := req["user_agent"].(bson.M)
-
-		if browser, found := userAgent["browser"].(string); found {
-			if browser != "" {
-				_, found := browsers[browser]
-				if found {
-					browsers[browser] += 1
-					continue
-				}
-
-				browsers[browser] = 1
-			}
-		}
-	}
-	urlInfo["countries"] = countries
-	urlInfo["referers"] = referers
-	urlInfo["browsers"] = browsers
-	return urlInfo, err
+	return &url, nil
 }

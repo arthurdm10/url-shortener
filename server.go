@@ -41,9 +41,13 @@ func NewServer(port string, db *mongo.Database) Server {
 	app.Static("/info/topojson", "./public/js")
 
 	app.Get("/", Home(&sv))
-	app.Post("/shorten", Shorten(&sv))
+
 	app.Get("/info/:code", URLInfo(&sv))
-	app.Delete("/del/:code", DeleteURL(&sv))
+	app.Get("/myUrls", MyURLs(&sv))
+	app.Post("/shorten", Shorten(&sv))
+
+	app.Get("/del/:code", DeleteURL(&sv))
+
 	app.Get("/:short", Redirect(&sv))
 
 	sv.app = app
@@ -51,6 +55,7 @@ func NewServer(port string, db *mongo.Database) Server {
 	return sv
 }
 
+//Run run server
 func (s *Server) Run() {
 	s.app.Listen(s.port)
 }
